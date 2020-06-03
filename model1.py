@@ -1,19 +1,14 @@
-import math
-import numpy as np
-import h5py
 import matplotlib.pyplot as plt
-import scipy
-from PIL import Image
-from scipy import ndimage
+import numpy as np
 import tensorflow as tf
 from tensorflow.python.framework import ops
-from load_photos import LoadPhotos
 from tqdm import tqdm
+
+from load_photos import LoadPhotos
 
 np.random.seed(1)
 
 from tensorflow.compat.v1 import ConfigProto
-from tensorflow.compat.v1 import InteractiveSession
 
 # config = tf.ConfigProto(
 #         device_count = {'CPU': 0}
@@ -69,13 +64,14 @@ class NetworkModel:
         # # FC
         # Z3 = tf.contrib.layers.fully_connected(P2, num_classes, activation_fn=None)
 
-        #shallow architecture
+        # shallow architecture
         Z1 = tf.nn.conv2d(X, w1, strides=[1, 1, 1, 1], padding='SAME')
         A1 = tf.nn.relu(Z1)
         P1 = tf.nn.max_pool(A1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
         P1 = tf.layers.flatten(P1)
-        Z3 = tf.contrib.layers.fully_connected(P1, num_classes, activation_fn=None) # dorzucicjedna warstwe gleboka
+        Z3 = tf.contrib.layers.fully_connected(P1, num_classes, activation_fn=None)  # dorzucicjedna warstwe gleboka
         return Z3
+
     # na razie bez dropouta
 
     def compute_cost(self, Z3, Y):
@@ -112,7 +108,7 @@ class NetworkModel:
                     z = sess.run(tf.argmax(tf.nn.softmax(Z), 1))[0]
                     # Z = sess.run(tf.nn.softmax(Z3), feed_dict={X: x})
                     # Z = sess.run(Z3, feed_dict={X: x})
-                    y = np.random.random(self.classes)/10 #bliskie zeru
+                    y = np.random.random(self.classes) / 10  # bliskie zeru
                     y[z] = 1
                     outputs.append(z)
                     # print(Z)
@@ -120,7 +116,7 @@ class NetworkModel:
                     # stworzyc macierz kwadratowa gdzie kazdej klasie uczacej odpowiadaja obrazy przypisane, zeby miec w akzdej itracji jak sie zmienialo
                     # zrobic dicta zeby miec dla kazdego neuronu przypisany obrazek i potem splot po kazdej
                     # epoce tych obrazkow, zbey zobaczyc jakie ksztalty sie pojawiaja
-                    #{'klasa': [obrazki],...}
+                    # {'klasa': [obrazki],...}
                 # print(y)
                 costs.append(cur_cost)
             saver = tf.train.Saver(tf.global_variables())
@@ -153,14 +149,15 @@ class NetworkModel:
 
 
 if __name__ == "__main__":
-    load = LoadPhotos(r'./mis/',  end_with='.png')
+    load = LoadPhotos(r'./mis/', end_with='.png')
     load_test = LoadPhotos(r'./test/', begin_with='test', end_with='.png')
-    X_train = load.load(128, 128) # moze byc mniejsze np 64 lub 32
+    X_train = load.load(128, 128)  # moze byc mniejsze np 64 lub 32
     X_test = load_test.load(128, 128)
     shape = X_train.shape
     print(f'{shape[0]} photos loaded of shape {shape[1:]}')
     np.random.shuffle(X_train)
     model = NetworkModel(picture_size=shape[1:], classes=10)
-    model.fit(X_train, learning_rate=0.0001, num_epochs=30) # learning na poczatku moze byc duzy, nwe 0.5, i zmniejszac dynamcznie
-                                                            #zmieniac dynamicznie np dzielic na 2 co 5 epok
+    model.fit(X_train, learning_rate=0.0001,
+              num_epochs=30)  # learning na poczatku moze byc duzy, nwe 0.5, i zmniejszac dynamcznie
+    # zmieniac dynamicznie np dzielic na 2 co 5 epok
     # model.predict(X_test[1])

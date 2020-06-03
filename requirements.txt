@@ -1,0 +1,7 @@
+opencv-python
+matplotlib
+keras
+numpy
+tqdm
+tensorflow==1.13.1
+

@@ -1,4 +1,4 @@
-from keras_preprocessing.image import ImageDataGenerator
+from keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 import glob
 import numpy as np
@@ -11,17 +11,23 @@ class Augmentation:
         self.data_for_augmentation = []
 
     def read_data_for_augmentation(self, data_path=None):
+        """
+        Read data from the given path
+        """
         if data_path == None:
             print('Specify path to images you want to augment')
             return
-        for img in glob.glob(f'{data_path}/*png'):
-            self.data_for_augmentation.append(plt.imread(img))
+        for img in glob.glob(f'{data_path}/*jpg'):
+            self.data_for_augmentation.append(plt.imread(img, 0)[:, :, :3])
         self.data_for_augmentation = np.array(self.data_for_augmentation)
         if len(self.data_for_augmentation) == 0:
             print('No images were found in the specified directory')
 
-    def augment_data(self, rotation_range=10, zoom_range=0.1, horizontal_flip=False, path_to_save='.',
-                     num_of_augmented_photos=10):
+    def augment_data(self, rotation_range=9, zoom_range=0.15, horizontal_flip=False, path_to_save='.',
+                     num_of_augmented_photos=10, name_of_augmented_photo='augmented'):
+        """
+        Augment loaded data and save in given directory
+        """
         if len(self.data_for_augmentation) == 0:
             print('Load images for augmentation first')
             return
@@ -36,10 +42,13 @@ class Augmentation:
         data_generator.fit(self.data_for_augmentation)
         image_iterator = data_generator.flow(self.data_for_augmentation)
         for i in range(num_of_augmented_photos):
-            plt.imsave(f'{path_to_save}/augmented{i}', image_iterator.next()[0])
+            plt.imsave(f'{path_to_save}/{name_of_augmented_photo}{i}.jpg', image_iterator.next()[0].astype(np.uint8))
 
 
-augmentation = Augmentation()
-
-augmentation.read_data_for_augmentation('data_for_augmentation')
-augmentation.augment_data(path_to_save='augmeented_data')
+if __name__ == "__main__":
+    augmentation = Augmentation()
+    for folder in ['mis', 'kufel', 'plyn']:
+        augmentation = Augmentation()
+        augmentation.read_data_for_augmentation(f'datasets/new/{folder}/')
+        augmentation.augment_data(path_to_save=f'datasets/new/{folder}/', num_of_augmented_photos=50,
+                                  name_of_augmented_photo='augmented')
