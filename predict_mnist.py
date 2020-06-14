@@ -12,19 +12,35 @@ import cv2
 from collections import defaultdict
 import os
 from collections import Counter
+from torchvision import datasets
 
 from visualize_filters import show_img
 
 # MODEL = Path('model_outputs/new/2/model_0_001_200_3.pt')
-MODEL = Path('model_outputs/new/granulacja/model_0_001_300_7.pt')
+MODEL = Path('model_outputs/new/mnist/model_0_001_50_10.pt')
 num_classes = int(MODEL.stem.split('_')[-1])
 
-# TO UNNORMALIZE IMG
-invTrans = transforms.Compose([ transforms.Normalize(mean = [ 0., 0., 0. ],
-                                                     std = [ 1/0.5, 1/0.5, 1/0.5 ]),
-                                transforms.Normalize(mean = [ -0.5, -0.5, -0.5 ],
-                                                     std = [ 1., 1., 1. ]),
-                               ])
+
+transform = transforms.Compose([
+    # transforms.Resize((64, 64)),
+    transforms.ToTensor(),
+    # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
+
+
+dataset = datasets.MNIST(root='data', train=True,
+                                   download=True, transform=transform)
+
+batch_size = 5000
+dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+num_classes = 10
+classes = dataset.classes
+
+
+# # displaying images
+dataiter = iter(dataloader)
+images, labels = dataiter.next()
+# images = images.numpy()  # convert images to numpy for display
 
 class Net(nn.Module):
     def __init__(self):
@@ -41,11 +57,12 @@ class Net(nn.Module):
         # self.fc2 = nn.Linear(512, 128)
         # self.fc3 = nn.Linear(128, num_classes)
 
-        self.conv1 = nn.Conv2d(3, 128, 3, padding=1)
-        self.conv2 = nn.Conv2d(128, 128, 3, padding=1)
-        self.conv3 = nn.Conv2d(128, 64, 3, padding=1)
-        self.conv4 = nn.Conv2d(64, 64, 5, padding=2)
-        self.conv5 = nn.Conv2d(64, 64, 5, padding=2)
+        # for mnist
+        self.conv1 = nn.Conv2d(1, 128, 3, padding=1)  # -> 14 after pooling
+        self.conv2 = nn.Conv2d(128, 128, 3, padding=2)  # -> 8 after pooling
+        self.conv3 = nn.Conv2d(128, 64, 3, padding=1)  # -> 4 after pooling
+        self.conv4 = nn.Conv2d(64, 64, 3, padding=1)
+
         self.maxpool = nn.MaxPool2d(2, 2)
 
         self.fc1 = nn.Linear(4 * 4 * 64, 512)
@@ -56,40 +73,28 @@ class Net(nn.Module):
         x = self.maxpool(F.relu(self.conv1(x)))
         x = self.maxpool(F.relu(self.conv2(x)))
         x = self.maxpool(F.relu(self.conv3(x)))
-        x = self.maxpool(F.relu(self.conv4(x)))
-        x = F.relu(self.conv5(x))
+        x = F.relu(self.conv4(x))
         x = x.view(-1, 4 * 4 * 64)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
 
-transform = transforms.Compose([
-    # transforms.Resize((64, 64)),
-    transforms.ToTensor(),
-    # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
+
 
 model = Net()
 model.cuda()
 
 # ten maping jest dobierany na podstawie zdjec wyjsciowych z modelu
-# preds_mapping = {
-#     0: 'mis',
-#     1: 'kufel',
-#     2: 'plyn'
-# }
-
 preds_mapping = {
-    'mis': [0],
-    'kufel': [2, 3],
-    'plyn': [1, 4]
-}
-
-preds_mapping = {
-    'mis': [3],
-    'kufel': [0, 1],
-    'plyn': [2, 4, 5, 6]
+    6: [0],
+    8: [1],
+    7: [2],
+    3: [3, 7],
+    1: [4],
+    5: [5],
+    0: [6],
+    9: [8, 9]
 }
 
 model.load_state_dict(torch.load(MODEL))
@@ -108,43 +113,23 @@ model.load_state_dict(torch.load(MODEL))
 # for all images
 predictions = defaultdict(lambda: np.ndarray(0))
 predictions_neuron = defaultdict(lambda: np.ndarray(0))
-for root, dirs, files in os.walk("datasets/new/"):
-    for file in files:
-        if '.jpg' in file:
-            path = root+'/' + file
-            img = Image.open(path)
-            img = transform(img)
-            output = torch.nn.Softmax()(model(img.unsqueeze(0).cuda()))
-            # _, pred = torch.max(output, 1)
-            # predictions[root.split('/')[-1]] = np.append(predictions[root.split('/')[-1]], preds_mapping[int(pred)])
 
-            #5 classess
-            _, pred = torch.max(output, 1)
-            for img_class, neurons in preds_mapping.items():
-                if int(pred) in neurons:
-                    predicted_class = img_class
-                    predicted_class_number = int(pred)
-                    break
-            predictions[root.split('/')[-1]] = np.append(predictions[root.split('/')[-1]], predicted_class)
-            predictions_neuron[root.split('/')[-1]] = np.append(predictions_neuron[root.split('/')[-1]], predicted_class_number)
-
-
-            # threshold set
-            # above_threshold = False
-            # for out in output.cpu().detach().numpy()[0]:
-            #     if out > 0.8:
-            #         above_threshold = True
-            # if above_threshold:
-            #     _, pred = torch.max(output, 1)
-            #     predictions[root.split('/')[-1]] = np.append(predictions[root.split('/')[-1]], preds_mapping[int(pred)])
-            # else:
-            #     predictions[root.split('/')[-1]] = np.append(predictions[root.split('/')[-1]], preds_mapping[0])
+for img, label in zip(images, labels):
+    output = torch.nn.Softmax()(model(img.unsqueeze(0).cuda()))
+    _, pred = torch.max(output, 1)
+    predicted_class = None
+    for img_class, neurons in preds_mapping.items():
+        if int(pred) in neurons:
+            predicted_class = img_class
+            break
+    predictions[int(label)] = np.append(predictions[int(label)], predicted_class)
+    predictions_neuron[int(label)] = np.append(predictions[int(label)], int(pred))
 
 
 # more than 3 classess
 for img_class, neurons in preds_mapping.items():
     acc = len(np.where(predictions[img_class]==img_class)[0])/len(predictions[img_class])
-    print(f'{img_class} -> {acc}')
+    print(f'{img_class} -> {acc:.2} % accuracy')
 
 # check what neurons were activated by images from each class
 # Counter(predictions_neuron['mis'])

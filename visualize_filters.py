@@ -31,9 +31,10 @@ def multiply_pixel(img, size):
     return new_img
 
 if __name__ == "__main__":
+
     pil = False
 
-    all_filters = pickle.load(open('filters_output/new/2/filters_dict_0_001_100_3.pickle', 'rb'))
+    all_filters = pickle.load(open('filters_output/new/2/filters_dict_0_001_200_3.pickle', 'rb'))
 
     # last one
     all_filters = list(all_filters.values())[-1]
@@ -48,7 +49,7 @@ if __name__ == "__main__":
 
     for num, (ax, im) in enumerate(zip(grid, all_filters)):
         # Iterating over the grid returns the Axes.
-        im = multiply_pixel(1.5*im, 4)
+        im = multiply_pixel(2*im, 4)
         ax.set_title(num)
         ax.set_axis_off()
         ax.imshow(im)

@@ -130,9 +130,9 @@ def find_n_best(output, n=1, num_classes=6):
 
 # check for different parameters
 
-lrs = [0.005, 0.001, 0.01]
-epochs = [100, 150, 200]
-classes = [3, 5]
+lrs = [0.001]
+epochs = [150, 200, 300]
+classes = [3, 4, 5, 6, 7]
 
 for lr in lrs:
     for num_epoch in epochs:
@@ -203,16 +203,16 @@ for lr in lrs:
                     if epoch % 5 == 0:
                         print(f'Epoch: {epoch}')
 
-                with open(f'pickle_outputs/new/2/class_image_dict_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pickle', 'wb') as f:
+                with open(f'pickle_outputs/new/granulacja/class_image_dict_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pickle', 'wb') as f:
                     pickle.dump(class_image_dict, f)
 
-                with open(f'layers_outputs/new/2/layer_dict_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pickle', 'wb') as f:
+                with open(f'layers_outputs/new/granulacja/layer_dict_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pickle', 'wb') as f:
                     pickle.dump(conv_layer_dict, f)
 
-                with open(f'filters_output/new/2/filters_dict_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pickle', 'wb') as f:
-                    pickle.dump(filters_dict, f)
+                # with open(f'filters_output/new/granulacja/filters_dict_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pickle', 'wb') as f:
+                #     pickle.dump(filters_dict, f)
 
-                torch.save(model.state_dict(), f'model_outputs/new/2/model_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pt')
+                torch.save(model.state_dict(), f'model_outputs/new/granulacja/model_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pt')
 
                 # del data
                 # torch.cuda.empty_cache()

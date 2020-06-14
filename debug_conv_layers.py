@@ -17,7 +17,7 @@ transform = transforms.Compose([
 layer_path = 'layers_outputs/new/2/layer_dict_0_001_200_3.pickle'
 layer = pickle.load(open(layer_path, 'rb'))
 
-img = Image.open('datasets/new/kufel/augmented0.jpg')
+img = Image.open('datasets/new/mis/augmented1.jpg')
 img = transform(img).unsqueeze(0)
 print("")
 # plt.imshow(layer[99](img.cuda())[0][0].cpu().detach().numpy())

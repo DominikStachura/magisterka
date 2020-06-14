@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import glob
 from pathlib import Path
 
-pickles = glob.glob('pickle_outputs/new/2/*.pickle')
+pickles = glob.glob('pickle_outputs/new/mnist/*.pickle')
 for pickle_dict in pickles:
 
     images = pickle.load(open(pickle_dict, 'rb'))
@@ -21,4 +21,4 @@ for pickle_dict in pickles:
             ax.set_title(f'Class {img_class} - number of photos assigned -> {len(images[img_class])}')
             ax.imshow(mean_image)
 
-    fig.savefig(f'mean_images_output/new/2/{Path(pickle_dict).stem}.png')
+    fig.savefig(f'mean_images_output/new/mnist/{Path(pickle_dict).stem}.png')
