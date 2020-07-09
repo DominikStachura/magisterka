@@ -50,5 +50,5 @@ if __name__ == "__main__":
     for folder in ['mis', 'kufel', 'plyn']:
         augmentation = Augmentation()
         augmentation.read_data_for_augmentation(f'datasets/new/{folder}/')
-        augmentation.augment_data(path_to_save=f'datasets/new/{folder}/', num_of_augmented_photos=50,
+        augmentation.augment_data(path_to_save=f'datasets/new/test/{folder}/', num_of_augmented_photos=50,
                                   name_of_augmented_photo='augmented')

@@ -1,0 +1,7 @@
+Labels,optimizer,lr,time_per_epoch,Num. of output classes,bear acc.,pint acc.,bottle acc.,total acc.
+True,Adam,0.001,0.114787498,3,100%,100%,100%,100%
+False,Adam,0.001,0.231572756,5,64.00%,86.00%,68.00%,72.67%
+False,Adam,0.001,0.239138144,7,48.00%,94.00%,94.00%,78.67%
+False,Adam,0.001,0.221231567,3,14.00%,80.00%,88.00%,60.67%
+False,Adadelta,1,0.228968546,3,24.00%,80.00%,36.00%,46.67%
+False,Adagrad,0.01,0.230134338,5,78.00%,76.00%,68.00%,74.00%

@@ -13,11 +13,13 @@ from collections import defaultdict
 import os
 from collections import Counter
 from torchvision import datasets
+import pickle
+from images_mean import generate_mean_images
 
 from visualize_filters import show_img
 
 # MODEL = Path('model_outputs/new/2/model_0_001_200_3.pt')
-MODEL = Path('model_outputs/new/mnist/model_0_001_50_10.pt')
+MODEL = Path('model_outputs/new/mnist/model_0_001_80_10.pt')
 num_classes = int(MODEL.stem.split('_')[-1])
 
 
@@ -27,20 +29,86 @@ transform = transforms.Compose([
     # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 
-
 dataset = datasets.MNIST(root='data', train=True,
-                                   download=True, transform=transform)
+                         download=True, transform=transform)
 
-batch_size = 5000
-dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
-num_classes = 10
-classes = dataset.classes
 
 
 # # displaying images
-dataiter = iter(dataloader)
-images, labels = dataiter.next()
+# dataiter = iter(dataloader)
+# images, labels = dataiter.next()
+# images, labels = dataiter.next()
+
+
 # images = images.numpy()  # convert images to numpy for display
+def convert_tensor_to_img(tensor):
+    # tensor = tensor / 2 + 0.5
+    return np.squeeze(np.transpose(tensor.cpu().numpy(), (1, 2, 0)))
+
+def plot_class_histograms(model, images, labels, num_classes = 10, generate_output_images=True, output_images_name='output'):
+    class_image_dict = defaultdict(list)
+    predictions = defaultdict(list)
+    for label, img in zip(labels, images):
+        output = torch.nn.Softmax()(model(img.unsqueeze(0).cuda()))
+        _, pred = torch.max(output, 1)
+        predictions[int(label)].append(int(pred))
+        if generate_output_images:
+            class_image_dict[int(pred)].append(convert_tensor_to_img(img))
+
+    if generate_output_images:
+        # with open(f'pickle_outputs/new/mnist/class_image_dict_manually_generated.pickle', 'wb') as f:
+        #     pickle.dump(class_image_dict, f)
+        generate_mean_images(class_image_dict, f'mean_images_output/new/mnist/{output_images_name}_generated')
+
+    plt.figure()
+    for index, (label, prediction) in enumerate(predictions.items()):
+        hist, bin_edges = np.histogram(prediction)
+        bin_edges = np.round(bin_edges, 0)
+        # plt.subplot(5, 2, index+1)
+        plt.plot()
+        plt.bar(bin_edges[:-1], hist, width=0.5)
+        plt.xlim(-0.5, num_classes-0.5)
+        plt.xticks(np.arange(0, num_classes))
+        plt.title(f'Label: {label}')
+        plt.xlabel("Predicted class")
+        plt.ylabel("Number of predicted classes")
+        plt.show()
+
+
+def compute_accuracy(model, images, labels, preds_mapping):
+    # for all images
+    predictions = defaultdict(lambda: np.ndarray(0))
+    predictions_neuron = defaultdict(lambda: np.ndarray(0))
+
+    for img, label in zip(images, labels):
+        output = torch.nn.Softmax()(model(img.unsqueeze(0).cuda()))
+        _, pred = torch.max(output, 1)
+        predicted_class = None
+        for img_class, neurons in preds_mapping.items():
+            if int(pred) in neurons:
+                predicted_class = img_class
+                break
+        predictions[int(label)] = np.append(predictions[int(label)], predicted_class)
+        predictions_neuron[int(label)] = np.append(predictions[int(label)], int(pred))
+
+    # more than 3 classess
+    for img_class, neurons in preds_mapping.items():
+        acc = len(np.where(predictions[img_class] == img_class)[0]) / len(predictions[img_class])
+        print(f'{img_class} -> {acc:.2} % accuracy')
+
+
+def create_class_imgs_dict(model, images):
+    class_image_dict = defaultdict(list)
+    for img in images:
+        output = torch.nn.Softmax()(model(img.unsqueeze(0).cuda()))
+        _, pred = torch.max(output, 1)
+        class_image_dict[int(pred)].append(convert_tensor_to_img(img))
+
+    with open(f'pickle_outputs/new/mnist/class_image_dict_manually_generated.pickle', 'wb') as f:
+        pickle.dump(class_image_dict, f)
+
+
+
 
 class Net(nn.Module):
     def __init__(self):
@@ -81,78 +149,32 @@ class Net(nn.Module):
         return x
 
 
-
 model = Net()
 model.cuda()
 
 # ten maping jest dobierany na podstawie zdjec wyjsciowych z modelu
 preds_mapping = {
-    6: [0],
-    8: [1],
-    7: [2],
-    3: [3, 7],
-    1: [4],
-    5: [5],
+    1: [2],
+    6: [1],
     0: [6],
-    9: [8, 9]
+    8: [4],
+    9: [0, 3]
 }
 
 model.load_state_dict(torch.load(MODEL))
 
 
-# for one image
+batch_size = 30000
+dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-# # # robi dobre predykcje
-# img = Image.open('datasets/new/mis/augmented2.jpg')
-# # img = Image.open('plyn_test.jpg')
-# img = transform(img)
-# output = model(img.unsqueeze(0).cuda())
-# _, pred = torch.max(output, 1)
-# print(preds_mapping[int(pred)])
+classes = dataset.classes
+dataiter = iter(dataloader)
+images, labels = dataiter.next()
 
-# for all images
-predictions = defaultdict(lambda: np.ndarray(0))
-predictions_neuron = defaultdict(lambda: np.ndarray(0))
+# histograms
 
-for img, label in zip(images, labels):
-    output = torch.nn.Softmax()(model(img.unsqueeze(0).cuda()))
-    _, pred = torch.max(output, 1)
-    predicted_class = None
-    for img_class, neurons in preds_mapping.items():
-        if int(pred) in neurons:
-            predicted_class = img_class
-            break
-    predictions[int(label)] = np.append(predictions[int(label)], predicted_class)
-    predictions_neuron[int(label)] = np.append(predictions[int(label)], int(pred))
+plot_class_histograms(model, images, labels, num_classes=num_classes, output_images_name=MODEL.stem)
 
+# create_class_imgs_dict(model, images)
+# compute_accuracy(model, images, labels, preds_mapping)
 
-# more than 3 classess
-for img_class, neurons in preds_mapping.items():
-    acc = len(np.where(predictions[img_class]==img_class)[0])/len(predictions[img_class])
-    print(f'{img_class} -> {acc:.2} % accuracy')
-
-# check what neurons were activated by images from each class
-# Counter(predictions_neuron['mis'])
-
-#3 classess
-# for img_class in preds_mapping.values():
-#     acc = len(np.where(predictions[img_class]==img_class)[0])/len(predictions[img_class])
-#     print(f'{img_class} -> {acc}')
-
-# preds = defaultdict(int)
-#
-# # imgs = glob.glob('datasets/kufel/*.png')
-# imgs = glob.glob('datasets/new/*.jpg')
-# for img in imgs:
-#     img = Image.open(img)
-#     img = transform(img)
-#     # plt.imshow(np.transpose(invTrans(img), (1, 2, 0)))
-#     plt.imshow(np.transpose(img, (1, 2, 0)))
-#     plt.show()
-#     # output = model(img.cuda())
-#     # _, pred = torch.max(output, 1)
-#     # preds[int(pred)] += 1
-#     # print(int(pred))
-#
-# for cls, val in preds.items():
-#     print(cls, '  -->  ', val)

@@ -160,7 +160,7 @@ for lr in lrs:
                 # wewnetrzne fory wykonuja sieraz bo batch size wielkosci calego zbioru
                 if epoch in increase_samples_number:
                     num_of_best += 1
-                for data, _ in dataloader:
+                for data, labels in dataloader:
                     data = data.cuda()
 
                     optimizer.zero_grad()
@@ -176,6 +176,7 @@ for lr in lrs:
                     for el in list(dataset.keys()):
                         for _ in range(num_of_best):
                             target.append(el)
+
 
                     # data = data[data_index]
                     target = torch.tensor(target).cuda()
