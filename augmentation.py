@@ -1,4 +1,4 @@
-from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 import glob
 import numpy as np
@@ -14,7 +14,7 @@ class Augmentation:
         """
         Read data from the given path
         """
-        if data_path == None:
+        if data_path is None:
             print('Specify path to images you want to augment')
             return
         for img in glob.glob(f'{data_path}/*jpg'):

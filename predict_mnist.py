@@ -1,26 +1,23 @@
 import torch
-from PIL import Image
-from torchvision import datasets, transforms
+from torchvision import transforms
 from pathlib import Path
-import torch.nn as nn
-import torch.nn.functional as F
-import glob
-from collections import defaultdict
+
 import matplotlib.pyplot as plt
 import numpy as np
-import cv2
 from collections import defaultdict
-import os
-from collections import Counter
 from torchvision import datasets
 import pickle
 from images_mean import generate_mean_images
+from architecture import Net
 
-from visualize_filters import show_img
+
+"""
+Similar to predict.py
+"""
 
 # MODEL = Path('model_outputs/new/2/model_0_001_200_3.pt')
-MODEL = Path('model_outputs/new/mnist/model_0_001_80_10.pt')
-num_classes = int(MODEL.stem.split('_')[-1])
+MODEL = Path('model_outputs/mnist_labels/model_0_001_80_10_8000labels.pt')
+num_classes = int(MODEL.stem.split('_')[-2])
 
 
 transform = transforms.Compose([
@@ -31,13 +28,6 @@ transform = transforms.Compose([
 
 dataset = datasets.MNIST(root='data', train=True,
                          download=True, transform=transform)
-
-
-
-# # displaying images
-# dataiter = iter(dataloader)
-# images, labels = dataiter.next()
-# images, labels = dataiter.next()
 
 
 # images = images.numpy()  # convert images to numpy for display
@@ -58,7 +48,7 @@ def plot_class_histograms(model, images, labels, num_classes = 10, generate_outp
     if generate_output_images:
         # with open(f'pickle_outputs/new/mnist/class_image_dict_manually_generated.pickle', 'wb') as f:
         #     pickle.dump(class_image_dict, f)
-        generate_mean_images(class_image_dict, f'mean_images_output/new/mnist/{output_images_name}_generated')
+        generate_mean_images(class_image_dict, f'images/{output_images_name}_generated')
 
     plt.figure()
     for index, (label, prediction) in enumerate(predictions.items()):
@@ -110,58 +100,25 @@ def create_class_imgs_dict(model, images):
 
 
 
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        # poczatkowa architektura ktora stosowalem
-        # self.conv1 = nn.Conv2d(3, 32, 5, padding=2)
-        # self.conv2 = nn.Conv2d(32, 32, 5, padding=2)
-        # self.conv3 = nn.Conv2d(32, 64, 3, padding=1)
-        # self.conv4 = nn.Conv2d(64, 64, 3, padding=1)
-        # self.conv5 = nn.Conv2d(64, 128, 3, padding=1)
-        # self.maxpool = nn.MaxPool2d(2, 2)
-        # # 2048 na wyjsciu z conv
-        # self.fc1 = nn.Linear(4 * 4 * 128, 512)
-        # self.fc2 = nn.Linear(512, 128)
-        # self.fc3 = nn.Linear(128, num_classes)
 
-        # for mnist
-        self.conv1 = nn.Conv2d(1, 128, 3, padding=1)  # -> 14 after pooling
-        self.conv2 = nn.Conv2d(128, 128, 3, padding=2)  # -> 8 after pooling
-        self.conv3 = nn.Conv2d(128, 64, 3, padding=1)  # -> 4 after pooling
-        self.conv4 = nn.Conv2d(64, 64, 3, padding=1)
-
-        self.maxpool = nn.MaxPool2d(2, 2)
-
-        self.fc1 = nn.Linear(4 * 4 * 64, 512)
-        self.fc2 = nn.Linear(512, 128)
-        self.fc3 = nn.Linear(128, num_classes)
-
-    def forward(self, x):
-        x = self.maxpool(F.relu(self.conv1(x)))
-        x = self.maxpool(F.relu(self.conv2(x)))
-        x = self.maxpool(F.relu(self.conv3(x)))
-        x = F.relu(self.conv4(x))
-        x = x.view(-1, 4 * 4 * 64)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-
-model = Net()
+model = Net(num_classes=num_classes, mnist=True)
 model.cuda()
 
 # ten maping jest dobierany na podstawie zdjec wyjsciowych z modelu
 preds_mapping = {
-    1: [2],
+    # 0: [5],
+    1: [5],
+    2: [2],
+    3: [0],
+    4: [6],
+    5: [3],
     6: [1],
-    0: [6],
-    8: [4],
-    9: [0, 3]
+    7: [7],
+    8: [8],
+    9: [9]
 }
 
-model.load_state_dict(torch.load(MODEL))
+model.load_state_dict(torch.load(MODEL)['model'])
 
 
 batch_size = 30000
@@ -173,8 +130,8 @@ images, labels = dataiter.next()
 
 # histograms
 
-plot_class_histograms(model, images, labels, num_classes=num_classes, output_images_name=MODEL.stem)
-
+# plot_class_histograms(model, images, labels, num_classes=num_classes, output_images_name=MODEL.stem)
+#
 # create_class_imgs_dict(model, images)
-# compute_accuracy(model, images, labels, preds_mapping)
+compute_accuracy(model, images, labels, preds_mapping)
 

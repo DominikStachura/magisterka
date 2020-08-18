@@ -1,12 +1,17 @@
 import pickle
-import numpy as np
 import matplotlib.pyplot as plt
 import glob
 from pathlib import Path
-from string import  ascii_lowercase
+from string import ascii_lowercase
 
 
 def generate_mean_images(images, output_file_name):
+    """
+    generates figure with mean images
+    :param images: dictinary with image class as a key and list of images as a value
+    :param output_file_name: name of generated figure
+    :return:
+    """
     mean_images = []
     for img_class, img_list in images.items():
         mean_images.append((img_class, sum(img / len(img_list) for img in img_list)))
@@ -19,7 +24,7 @@ def generate_mean_images(images, output_file_name):
             ax = fig.add_subplot(1, len(images), counter)
             # ax.set_title(f'Class {img_class} - number of photos assigned -> {len(images[img_class])}')
             # ax.set_title(f'{img_class}', y=-0.1, fontsize=25)
-            ax.set_title(f'{annotation})', y=-0.15, fontsize=25)
+            ax.set_title(f'{annotation})', y=-0.25, fontsize=25)
             ax.axis('off')
             ax.imshow(mean_image)
     # fig.tight_layout(pad=3)

@@ -1,99 +1,52 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torchvision import datasets, transforms
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-import pickle
-from copy import deepcopy
-from torchvision import datasets
+import time
 
+from copy import deepcopy
+from torchvision import datasets, transforms
 from collections import defaultdict
 
-batch_size = 1
+from images_mean import generate_mean_images
+from architecture import Net
+
 
 
 def convert_tensor_to_img(tensor):
+    """
+    Converts torch tensor to 3D matrix image
+    :param tensor:
+    :return image
+    """
     # tensor = tensor / 2 + 0.5
     return np.squeeze(np.transpose(tensor.cpu().numpy(), (1, 2, 0)))
 
 
 def show_img(img):
+    """
+    Display image out of tensor
+    :param img:
+    :return:
+    """
     img = img / 2 + 0.5  # unnormalize
     plt.imshow(np.transpose(img, (1, 2, 0)))
 
 
+# only tensor converting
 transform = transforms.Compose([
-    # transforms.Resize((64, 64)),
     transforms.ToTensor(),
-    # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 
+# built in MNST dataset
 dataset = datasets.MNIST(root='data', train=True,
                          download=True, transform=transform)
 
-# batch_size = len(dataset)
-batch_size = 2000
+# batch_size = len(dataset) # too much RAM memory needed to use whole MNIST
+batch_size = 200
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 num_classes = 2 * len(dataset.classes)
-classes = dataset.classes
-
-
-# # displaying images
-# dataiter = iter(dataloader)
-# images, labels = dataiter.next()
-# images = images.numpy()  # convert images to numpy for display
-#
-# # plot the images in the batch, along with the corresponding labels
-# fig = plt.figure(figsize=(25, 4))
-# # display 20 images
-
-# for idx in np.arange(len(images)):
-#     ax = fig.add_subplot(2, 20 / 2, idx + 1, xticks=[], yticks=[])
-#     show_img(images[idx])
-#     ax.set_title(classes[labels[idx]])
-# plt.show()
-
-# define architecture
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        # poczatkowa architektura ktora stosowalem
-        # self.conv1 = nn.Conv2d(3, 32, 5, padding=2)
-        # self.conv2 = nn.Conv2d(32, 32, 5, padding=2)
-        # self.conv3 = nn.Conv2d(32, 64, 3, padding=1)
-        # self.conv4 = nn.Conv2d(64, 64, 3, padding=1)
-        # self.conv5 = nn.Conv2d(64, 128, 3, padding=1)
-        # self.maxpool = nn.MaxPool2d(2, 2)
-        # # 2048 na wyjsciu z conv
-        # self.fc1 = nn.Linear(4 * 4 * 128, 512)
-        # self.fc2 = nn.Linear(512, 128)
-        # self.fc3 = nn.Linear(128, num_classes)
-
-        # for mnist
-        self.conv1 = nn.Conv2d(1, 128, 3, padding=1)  # -> 14 after pooling
-        self.conv2 = nn.Conv2d(128, 128, 3, padding=2)  # -> 8 after pooling
-        self.conv3 = nn.Conv2d(128, 64, 3, padding=1)  # -> 4 after pooling
-        self.conv4 = nn.Conv2d(64, 64, 3, padding=1)
-
-        self.maxpool = nn.MaxPool2d(2, 2)
-
-        self.fc1 = nn.Linear(4 * 4 * 64, 512)
-        self.fc2 = nn.Linear(512, 128)
-        self.fc3 = nn.Linear(128, num_classes)
-
-    def forward(self, x):
-        x = self.maxpool(F.relu(self.conv1(x)))
-        x = self.maxpool(F.relu(self.conv2(x)))
-        x = self.maxpool(F.relu(self.conv3(x)))
-        x = F.relu(self.conv4(x))
-        x = x.view(-1, 4 * 4 * 64)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
 
 # implement xavier
 # def weights_init(m):
@@ -108,120 +61,125 @@ class Net(nn.Module):
 
 
 def find_n_best(output, n=1, num_classes=6):
+    """
+    function takes outputs from whole dataset or big batches forward pass and choose samples
+    that strengthen each neuron most
+    :param output: output from the network
+    :param n: number of samples for each class
+    :param num_classes: number of classes to which function will assign samples
+    :return: new dataset with best samples chosen for each class
+    """
     # {target0: [zdj1, zdj2...], target1:[...]}
     dataset = defaultdict(list)
     output = output.cpu().detach().numpy()
     output_to_update = deepcopy(output)
     for i in range(num_classes):
+        # choose n best samples basing on the maximum value on i th vector position
         best = sorted(output_to_update, key=lambda x: x[i])[::-1][:n]
         for el in best:
+            # append index of the best sample on the i th position
             dataset[i].append(np.where(output == el)[0][0])
-            output_to_update = np.delete(output_to_update, np.where(output_to_update == el)[0][0], axis=0)
-        # for j in range(n):
-        #     # data_index = np.where(output == max(output, key=lambda x: x[i]))[0][0]
-        #     sorted_outputs = sorted(output, key=lambda x: x[i])[::-1]
-        #     best = np.where(output == sorted_outputs[0])
-        #     for el in best:
-        #
-        #     dataset[i].append(data_index)
-        # usuwam po dodaniu, bo na poczatku nie wiem czemu zawsze jeden ma wszystkie maxy, i to by znowu zepsulo caly proces
-        # output = np.delete(output, data_index, axis=0)
+            try:
+                # deleting previously used sample to avoid using the same one again
+                # necessary because network sometimes was choosing one sample for each output neuron
+                # and it was corrupting whole process
+                output_to_update = np.delete(output_to_update, np.where(output_to_update == el)[0][0], axis=0)
+            except Exception as e:
+                print(e)
+                continue
     return dataset
 
 
-# check for different parameters
-
+# Grid search for finding best model
 lrs = [0.001]
-epochs = [50]
-classes = [10]
+epochs = [100, 150]
+classes = [10, 15]
+labeled = [3, 4]
 
-for lr in lrs:
-    for num_epoch in epochs:
-        for num_classes in classes:
+for num_labeled in labeled:
+    for lr in lrs:
+        for num_epoch in epochs:
+            for num_classes in classes:
 
-            model = Net()
-            # model.apply(weights_init)
-            model.cuda()
+                model = Net(num_classes=num_classes, mnist=True)
+                # model.apply(weights_init)
+                model.cuda()
 
-            criterion = nn.CrossEntropyLoss()
-            optimizer = optim.Adam(model.parameters(), lr=lr)
+                criterion = nn.CrossEntropyLoss()
+                optimizer = optim.Adam(model.parameters(), lr=lr)
 
-            class_image_dict = {i: [] for i in range(num_classes)}
-            filters_dict = {}
+                # dictionary which is used to store image samples for each output neuron
+                class_image_dict = {i: [] for i in range(num_classes)}
 
-            # main loop
-            num_of_best = 1
-            save_conv_layer = np.linspace(1, num_epoch - 1, 20, dtype=int)
-            increase_samples_number = np.linspace(3, num_epoch - 1, 50, dtype=int)
-            conv_layer_dict = {}
-            for epoch in range(1, num_epoch):
-                # najpierw sprawdzam co wypluje model i na tej podstawie dobieram labele
-                # model.eval()
-                # wewnetrzne fory wykonuja sieraz bo batch size wielkosci calego zbioru
-                if epoch in increase_samples_number:
-                    num_of_best += 1
-                for data, labels in dataloader:
-                    data = data.cuda()
+                # main loop
+                num_of_best = 1  # initial value
+                # indicates in which epochs number of samples for each neuron will be increased
+                increase_samples_number = np.linspace(3, num_epoch - 1, 50, dtype=int)
+                start_time = time.time()
+                for epoch in range(1, num_epoch):
 
-                    optimizer.zero_grad()
-                    output = model(data)
+                    if epoch in increase_samples_number:
+                        num_of_best += 1
+                    for batch_number, (data, labels) in enumerate(dataloader):
+                        data = data.cuda()
+                        optimizer.zero_grad()
+                        output = model(data)
+                        # for few first batches labeled data are used to lead the learning in correct direction
+                        if epoch == 1 and batch_number in list(range(num_labeled)):
+                            print('labeled')
+                            labels = labels.cuda()
+                            loss = criterion(output, labels)
+                            loss.backward()
+                            optimizer.step()
+                        else:
+                            # learning without labels, dataset is being created by find_n_best function
+                            dataset = find_n_best(output, n=num_of_best, num_classes=num_classes)
+                            data_index = []
+                            target = []
+                            for value in list(dataset.values()):
+                                for el in value:
+                                    # indexes of samples that will be used for training
+                                    data_index.append(el)
+                            for el in list(dataset.keys()):
+                                # labels of samples that will be used for training
+                                for _ in range(num_of_best):
+                                    target.append(el)
+                            target = torch.tensor(target).cuda()
 
-                    dataset = find_n_best(output, n=num_of_best, num_classes=num_classes)
-                    # target = torch.argmax(torch.nn.Softmax()(output), dim=1)
-                    data_index = []
-                    target = []
-                    for value in list(dataset.values()):
-                        for el in value:
-                            data_index.append(el)
-                    for el in list(dataset.keys()):
-                        for _ in range(num_of_best):
-                            target.append(el)
+                            loss = criterion(output[data_index], target)
 
+                            loss.backward()
 
-                    # data = data[data_index]
-                    target = torch.tensor(target).cuda()
+                            optimizer.step()
 
-                    # new_output = model
-                    loss = criterion(output[data_index], target)
+                            # if epoch in save_conv_layer:
+                            #     conv_layer_dict[epoch] = deepcopy(model.conv1)
+                            if epoch > num_epoch - 5:
+                                # save few last samples in the dictionary to create the figure with mean images
+                                for index, tensor in zip(target, data[data_index]):
+                                    class_image_dict[int(index)].append(convert_tensor_to_img(tensor))
 
-                    loss.backward()
+                    if epoch % 5 == 0:
+                        print(f'Epoch: {epoch}')
 
-                    optimizer.step()
+                # commented out in the MNIST because .pickle file weight was too big
+                # with open(f'class_image_dict_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pickle', 'wb') as f:
+                #     pickle.dump(class_image_dict, f)
 
-                    # if epoch in save_conv_layer:
-                    #     conv_layer_dict[epoch] = deepcopy(model.conv1)
+                end_time = time.time()
+                # generate image from class_image_dict and save it
+                generate_mean_images(class_image_dict,
+                                     f'img_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}_{num_labeled * 2000}labels.jpg')
+                # colab saving, used for training on google colab, not local deelopment
+                # copy2(f'img_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}_{num_labeled * 2000}labels.jpg',
+                #       'drive/My Drive/magisterka/colab_outputs')
 
-                    for index, tensor in zip(target, data[data_index]):
-                        class_image_dict[int(index)].append(convert_tensor_to_img(tensor))
-
-                    # filters_dict[epoch] = model.conv1.weight.data.permute(0, 2, 3, 1).cpu().numpy()
-
-                # del data
-                # torch.cuda.empty_cache()
-
-                if epoch % 5 == 0:
-                    print(f'Epoch: {epoch}')
-
-            with open(f'class_image_dict_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pickle', 'wb') as f:
-                pickle.dump(class_image_dict, f)
-
-            # with open(f'layers_outputs/new/mnist/layer_dict_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pickle', 'wb') as f:
-            #     pickle.dump(conv_layer_dict, f)
-
-            # with open(f'filters_output/new/granulacja/filters_dict_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pickle', 'wb') as f:
-            #     pickle.dump(filters_dict, f)
-
-            torch.save(model.state_dict(), f'model_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}.pt')
-
-            # del data
-            # torch.cuda.empty_cache()
-            # test, be akualizowania wag
-            # model.eval()
-            # for epoch in range(1, 30):
-            #     for data, _ in dataloader:
-            #         data = data.cuda()
-            #         output = model(data)
-            #         _, pred = torch.max(output, 1)
-            #         # pred = torch.max(torch.nn.Softmax(dim=1)(output), 1)
-            #         max_output = int(pred.cpu().numpy())
+                time_for_epoch = (end_time - start_time) / num_epoch
+                # Saving trained model with the information about parameters
+                torch.save({'model': model.state_dict(),
+                            'time_per_epoch': time_for_epoch,
+                            'optimizer': optimizer.defaults},
+                           f'model_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}_{num_labeled * 2000}labels.pt')
+                # copy2(f'model_{str(lr).replace(".", "_")}_{num_epoch}_{num_classes}_{num_labeled * 2000}labels.pt',
+                #       'drive/My Drive/magisterka/colab_outputs')
 

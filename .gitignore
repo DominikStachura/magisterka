@@ -4,3 +4,5 @@ augmented_data/
 data_for_augmentation/
 datasets/
 */
+.idea/*
+.idea
